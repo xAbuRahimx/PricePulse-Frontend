@@ -248,38 +248,16 @@ function PriceTracker() {
     setImportError("");
     setImportResult(null);
     try {
-      const response = await fetch("https://api.anthropic.com/v1/messages", {
+      const response = await fetch(`${API_BASE}/search-product`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: "claude-sonnet-4-20250514",
-          max_tokens: 1500,
-          tools: [{ type: "web_search_20250305", name: "web_search" }],
-          system: "You are a product data extractor. Always respond with ONLY a valid JSON object, no other text.",
-          messages: [{
-            role: "user",
-            content: `Search for this product on Amazon Egypt, Noon, or Jumia and find its current price: "${importSearchQuery}"
-
-Respond with ONLY this JSON (no other text):
-{"name":"Product Name","currentPrice":12345,"originalPrice":15000,"currency":"EGP","category":"Electronics","image":"📱","inStock":true,"discount":18,"description":"brief description","brand":"noon"}
-
-Rules:
-- currentPrice and originalPrice are numbers only
-- If price is in USD multiply by 50 for EGP
-- brand must be one of: noon, amazon, jumia, carrefour, ikea, adidas, zara, lcwaikiki
-- discount = round((originalPrice-currentPrice)/originalPrice*100), if no discount set 0
-- Pick appropriate emoji
-- ONLY the JSON, nothing else`
-          }]
-        })
+        body: JSON.stringify({ query: importSearchQuery })
       });
-      const data = await response.json();
-      if (data.error) throw new Error(data.error.message);
-      const text = data.content.filter(c => c.type === "text").map(c => c.text).join("");
-      const jsonMatch = text.match(/\{[\s\S]*?\}/);
-      if (!jsonMatch) throw new Error("مش لاقي نتايج — جرب اسم تاني");
-      const parsed = JSON.parse(jsonMatch[0]);
-      if (!parsed.name || !parsed.currentPrice) throw new Error("البيانات ناقصة — جرب اسم أكثر تحديداً");
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.detail || "فشل البحث");
+      }
+      const parsed = await response.json();
       const newProduct = {
         id: Date.now(), ...parsed,
         brand: parsed.brand || "amazon",
